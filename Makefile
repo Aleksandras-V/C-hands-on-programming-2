@@ -1,9 +1,6 @@
 DEBUG = -g
-CC = /home/angel998/qnx710/host/linux/x86_64/usr/bin/qcc
+CC = qcc
 LD = qcc
-
-export QNX_HOST = /home/angel998/qnx710/host/linux/x86_64/
-export QNX_TARGET = /home/angel998/qnx710/target/qnx7/
 
 TARGET = -Vgcc_ntox86_64
 

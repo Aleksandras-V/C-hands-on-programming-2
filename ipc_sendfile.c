@@ -11,6 +11,11 @@
 
 int main(int argc, char *argv[]) {
 
+	if (argc < 2){
+		display_arg_error();
+		exit(EXIT_FAILURE);
+	}
+
 	char* fileName=NULL;
 	int next_option;
 
@@ -112,6 +117,7 @@ int ipc_send_message(char* fileName){
 	header.msg_type=IOV_MSG_TYPE;
 
 	int last_part_size = fileSize%iov_block_size;
+	printf("iov nb = %d\n",(fileSize/iov_block_size)+2);
 	iov_t siov[(fileSize/iov_block_size)+2];
 
     unsigned char* buffer=readFile(fileName); //getting the data into the buffer
@@ -153,7 +159,6 @@ unsigned char* readFile(char *File){
 	int fd;
     int size_read;
     int fileSize= filesize(File);
-    unsigned char buffer[fileSize];
     unsigned char* content = malloc(fileSize);
 
     fd = open( File, O_RDONLY );
@@ -162,14 +167,13 @@ unsigned char* readFile(char *File){
     	exit(EXIT_FAILURE);
     }
 
-    size_read = read( fd, buffer,fileSize);
+    size_read = read( fd, content,fileSize);
 
     if( size_read == -1 ) {
         perror( "Error reading myfile" );
         exit (EXIT_FAILURE);
     }
     close (fd);
-    memcpy(content,buffer,fileSize);
 
     return content;
 }
