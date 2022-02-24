@@ -7,7 +7,12 @@ TARGET = -Vgcc_ntox86_64
 CFLAGS += $(DEBUG) $(TARGET) -Wall
 LDFLAGS+= $(DEBUG) $(TARGET)
 
-clean:
-	rm -f *.o ipc_receivefile ipc_sendfile
+BINS = ipc_sendfile ipc_receivefile
 
-all: ipc_receivefile ipc_sendfile
+all: $(BINS)
+
+ipc_sendfile: ipc_sendfile.c
+ipc_receivefile: ipc_receivefile.c
+
+clean:
+	rm -f *.o $(BINS)
