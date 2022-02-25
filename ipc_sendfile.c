@@ -69,7 +69,8 @@ int main(int argc, char *argv[]) {
 	    		exit(EXIT_FAILURE);
 	    	}
 	    	return ipc_send_shm(fileName);
-	    	//return 1;
+	   case 'f':
+	    	break;
 
 	    case '?':   /* The user specified an invalid option.  */
 	    	display_arg_error();
