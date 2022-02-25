@@ -3,8 +3,9 @@
 
 int ipc_send_message(char* fileName);
 int ipc_send_shm(char* fileName);
+int ipc_send_pipe(char* fileName);
 unsigned char* readFile(char *File); // Allocates and returns the address to the binary data of a file;
-int lineNumberFile(char* File); // return the number of lines of a file.
+
 int filesize(char* filename);
 
 
@@ -12,8 +13,10 @@ int filesize(char* filename);
 #define GET_SHMEM_MSG_TYPE (_IO_MAX + 2)
 #define CHANGED_SHMEM_MSG_TYPE (_IO_MAX+3)
 //#define RELEASE_SHMEM_MSG_TYPE (_IO_MAX+4)
+#define PIPE_FD_SEND (_IO_MAX+5)
 #define iov_block_size 4096
 #define semaphore_ready (_PULSE_CODE_MINAVAIL)
+#define pipe_size 4096
 
 typedef struct
 {
@@ -32,3 +35,6 @@ typedef struct changed_shmem_msg {
 	uint16_t type;
 	unsigned length;
 } changed_shmem_msg_t;
+
+/// PIPE
+#define pipe_name ("/tmp/pipe")

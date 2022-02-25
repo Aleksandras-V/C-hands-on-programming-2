@@ -22,14 +22,14 @@ int main(int argc, char *argv[]) {
 	int next_option;
 
 
-	const char* const short_options = "hms:f";
+	const char* const short_options = "hmsp:f";
 
 
 	const struct option long_options[] = {
 		{ "help",     0, NULL, 'h' },
 	    { "messages",   0, NULL, 'm' },
 		//{ "queue",     0, NULL, 'q' },
-		//{ "pipe",     0, NULL, 'p' },
+		{"pipe",     0, NULL, 'p' },
 		{ "shm",     0, NULL, 's' },
 		{ "file",     1, NULL, 'f' },
 		{ NULL,       0, NULL, 0   }   /* Required at end of array.  */
@@ -69,7 +69,14 @@ int main(int argc, char *argv[]) {
 	    		exit(EXIT_FAILURE);
 	    	}
 	    	return ipc_send_shm(fileName);
-	    	//return 1;
+	    case 'p':   /* -p or --pipe */
+	    	if (fileName == NULL){
+	    		printf("ERROR: To copy a file using pipe type:\nipc_sendfile --pipe --file <path_to_source/file>\nfor more informations:   ipc_sendfile --help    \n");
+	    		exit(EXIT_FAILURE);
+	    	}
+	    	return ipc_send_pipe(fileName);
+	    case 'f':
+	    	break;
 
 	    case '?':   /* The user specified an invalid option.  */
 	    	display_arg_error();
@@ -90,6 +97,7 @@ void display_help(void)
     printf("To display this message: ipc_sendfile --help \n");
     printf("To send a file using messages: ipc_sendfile --messages --file <path_to_source/file> \n");
     printf("To copy a file using shared memory type:\nipc_sendfile --shm --file <path_to_source/file>\n");
+    printf("To copy a file using pipe type:\nipc_sendfile --pipe --file <path_to_source/file>\n");
 }
 void display_arg_error(void)
 {
@@ -251,6 +259,7 @@ int ipc_send_shm(char* fileName){
 		exit(EXIT_FAILURE);
 	}
 	printf("Done! \n");
+	free (content);
 
 	changed_msg.type = CHANGED_SHMEM_MSG_TYPE;
 	changed_msg.length = fileSize;
@@ -266,6 +275,67 @@ int ipc_send_shm(char* fileName){
 	printf("Unmaping the shared area! \n");
 	(void)munmap(mem_ptr, fileSize);
 	printf("Work done, exiting! \n");
+
+	return 0;
+}
+int ipc_send_pipe(char* fileName){
+
+	int status;
+	int fileSize;
+	unsigned char* buffer;
+	int fd;
+	int part_size;
+
+	char* fifoName = pipe_name;
+
+	printf("Creating the pipe... \n");
+
+	status=mkfifo(fifoName, S_IRWXU | S_IRWXG);
+	if (errno == EEXIST){
+		remove(pipe_name);
+		status=mkfifo(fifoName, S_IRWXU | S_IRWXG);
+	}
+	if(status == -1){
+		perror("Mkfifo");
+		exit(EXIT_FAILURE);
+	}
+
+	fd = open(fifoName,O_WRONLY);
+	if(fd == -1){
+		perror("Open FIFO");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("Filling the pipe... \n");
+
+	buffer=readFile(fileName);
+	fileSize = filesize(fileName);
+	part_size = fileSize % pipe_size;
+
+	int i;
+	for (i=0; i<(fileSize/pipe_size)+1;i++){
+		if (i == (fileSize/pipe_size)){ // case of the last part to send
+			status=write(fd,buffer+(i*pipe_size),part_size);
+		}
+		else{ // normal case
+			status=write(fd,buffer+(i*pipe_size),pipe_size);
+		}
+		if (status == -1) {
+			perror("write()");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	free(buffer);
+	status=close (fd);
+	if (status == -1)
+	{
+		perror("close()");
+		exit(EXIT_FAILURE);
+	}
+
+
+	printf("Pipe copied successfully to the pipe, exiting... \n");
 
 	return 0;
 }
