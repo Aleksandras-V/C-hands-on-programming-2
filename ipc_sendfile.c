@@ -125,7 +125,7 @@ int ipc_send_message(char* fileName){
 	SETIOV (&siov[0], &header, sizeof header); //setting header IOV
 
 	for(i=1;i<=fileSize/iov_block_size+1;i++){ //setting data IOVs
-		if (i == fileSize/iov_block_size+1){ //in case it is the last IOV
+		if (i == fileSize/iov_block_size+1){ //in case it is the last IOV (the last iov probably doesn't take all the iov_block_size thats why we set it with less size).
 			SETIOV (&siov[i], &buffer[(i-1)*iov_block_size], last_part_size);
 		} else { //else
 			SETIOV (&siov[i], &buffer[(i-1)*iov_block_size], iov_block_size);
