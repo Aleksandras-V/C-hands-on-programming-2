@@ -109,7 +109,7 @@ int ipc_receive_message(char* fileName)
 	int rcvid;
 	msg_buf_t msg;
 	int status;
-	int messageStatus=1;
+	int messageStatus = 1;
 
 
 	// register our name so the client can find us
@@ -152,7 +152,7 @@ int ipc_receive_message(char* fileName)
 			{
 
 				iov_t siov[(msg.header.data_size/iov_block_size)+1];
-				int last_part_size = msg.header.data_size%iov_block_size;
+				int last_part_size = msg.header.data_size%iov_block_size; //since we cut the data into multiple iov_block_size iovs the last part will probably not take all its size this is why we create a smaller one.
 
 				int i;
 				for (i=0;i<=(msg.header.data_size/iov_block_size);i++)
