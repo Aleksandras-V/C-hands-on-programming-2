@@ -13,14 +13,15 @@ void display_arg_error(void); // displays arguments error message
 int ipc_receive_message(char* fileName);// receives a file using messages, returns status;
 int ipc_receive_shm(char* fileName);// receives a file using shared memory, returns status;
 int ipc_receive_pipe(char* fileName);// receives a file using pipe returns status;
+int ipc_receive_queue(char* fileName);// receives a file using queue returns status;
 
 void fileInit(char* file); // Prepares a file (overwrites if it isn't empty)
-int writeFile(unsigned char* textmsg,char* file,int size); //Writes size characters of char* textmsg to the file specified.
+int writeFile(char* textmsg,char* file,int size); //Writes size characters of char* textmsg to the file specified.
 int create_shared_memory(unsigned nbytes, int client_pid, void **ptr, shm_handle_t *handle);
 
 typedef struct
 {
-	unsigned char string[MAX_STRING_LEN + 1]; //ptr to string we're sending to server, to make it
+	char string[MAX_STRING_LEN + 1]; //ptr to string we're sending to server, to make it
 } ipc_msg_t;//easy, server assumes a max of 256 chars!!!!
 
 
