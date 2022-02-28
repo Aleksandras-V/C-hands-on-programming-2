@@ -6,6 +6,8 @@
 #include <sys/dispatch.h>
 #include <sys/neutrino.h>
 #include <getopt.h>
+#include <sys/netmgr.h>
+#include <semaphore.h>
 #include "ipc_receivefile.h"
 #include "ipc_sendfile.h"
 
@@ -20,7 +22,7 @@ int main(int argc, char *argv[]) {
 	int next_option;
 
 
-	const char* const short_options = "hm:f";
+	const char* const short_options = "hms:f";
 
 
 	const struct option long_options[] = {
@@ -28,7 +30,7 @@ int main(int argc, char *argv[]) {
 	    { "messages",   0, NULL, 'm' },
 		//{ "queue",     0, NULL, 'q' },
 		//{ "pipe",     0, NULL, 'p' },
-		//{ "shm",     0, NULL, 's' },
+		{ "shm",     0, NULL, 's' },
 		{ "file",     1, NULL, 'f' },
 		{ NULL,       0, NULL, 0   }   /* Required at end of array.  */
 	};
@@ -61,6 +63,14 @@ int main(int argc, char *argv[]) {
 	    		exit(EXIT_FAILURE);
 	    	}
 	    	return ipc_send_message(fileName);
+	    case 's':   /* -s or --shm */
+	    	if (fileName == NULL){
+	    		printf("ERROR: To copy a file using shared memory type:\nipc_sendfile --shm --file <path_to_source/file>\nfor more informations:   ipc_sendfile --help    \n");
+	    		exit(EXIT_FAILURE);
+	    	}
+	    	return ipc_send_shm(fileName);
+	   case 'f':
+	    	break;
 
 	    case '?':   /* The user specified an invalid option.  */
 	    	display_arg_error();
@@ -80,6 +90,7 @@ void display_help(void)
     printf("Commands:\n");
     printf("To display this message: ipc_sendfile --help \n");
     printf("To send a file using messages: ipc_sendfile --messages --file <path_to_source/file> \n");
+    printf("To copy a file using shared memory type:\nipc_sendfile --shm --file <path_to_source/file>\n");
 }
 void display_arg_error(void)
 {
@@ -99,7 +110,7 @@ int ipc_send_message(char* fileName){
 
 	while (coid == -1){
 		printf("Connecting to message receiver... \n");
-		coid = name_open(RECV_NAME, 0);
+		coid = name_open(MSG_RECV_NAME, 0);
 		if (coid == -1){
 			sleep(2);
 		}
@@ -117,7 +128,6 @@ int ipc_send_message(char* fileName){
 	header.msg_type=IOV_MSG_TYPE;
 
 	int last_part_size = fileSize%iov_block_size;
-	printf("iov nb = %d\n",(fileSize/iov_block_size)+2);
 	iov_t siov[(fileSize/iov_block_size)+2];
 
     unsigned char* buffer=readFile(fileName); //getting the data into the buffer
@@ -153,6 +163,120 @@ int ipc_send_message(char* fileName){
 
 	return 0;
 }
+
+int ipc_send_shm(char* fileName){
+	int coid=-1;
+	int status;
+	int mem_fd;
+	char *mem_ptr;
+
+	get_shmem_msg_t get_msg;
+	get_shmem_resp_t get_resp;
+
+	changed_shmem_msg_t changed_msg;
+
+	sem_t* semPtr;	/* Pointer to semaphore */
+
+	unsigned char* content;
+
+
+	void* gatekeeper(void*);
+
+	status=pthread_setname_np(pthread_self() ,"shm_file_exchange");
+	if (status != 0){
+		perror("pthread_setname_np");
+		exit(EXIT_FAILURE);
+	}
+
+	int fileSize = filesize(fileName);
+
+	content = readFile(fileName);
+
+	/* find our server */
+	while (coid == -1){
+		printf("Connecting to shared memory receiver... \n");
+		coid = name_open(SHMEM_SERVER_NAME, 0);
+		if (coid == -1){
+			sleep(2);
+		}
+	}
+
+	printf("Creating semaphore to protect shared memory... \n");
+
+	semPtr= sem_open("Semaphore",O_CREAT,O_EXCL,S_IRWXU,1);
+	if (semPtr == SEM_FAILED){
+		perror ("sem_open");
+		exit(EXIT_FAILURE);
+	}
+	status = MsgSendPulse(coid, -1, semaphore_ready, 0);
+	if (status == -1)
+	{
+		perror("MsgSendPulse");
+	}
+
+	get_msg.type = GET_SHMEM_MSG_TYPE;
+	get_msg.shared_mem_bytes = fileSize;
+
+	printf("Asking for creation of a shared area... \n");
+	status = MsgSend(coid, &get_msg, sizeof(get_msg), &get_resp, sizeof(get_resp));
+	if (status == -1)
+	{
+		perror("Get shmem MsgSend");
+		exit(EXIT_FAILURE);
+	}
+
+	mem_fd = shm_open_handle(get_resp.mem_handle, O_RDWR);
+	if( mem_fd == -1 ) {
+		perror("shm_open_handle");
+		exit(EXIT_FAILURE);
+	}
+
+	mem_ptr = mmap(NULL, fileSize, PROT_READ|PROT_WRITE, MAP_SHARED, mem_fd, 0);
+	if(mem_ptr == MAP_FAILED) {
+		perror("mmap");
+		exit(EXIT_FAILURE);
+	}
+
+	/* once mapped, we don't need the fd anymore */
+	close(mem_fd);
+
+	printf("Writing in the shared area... \n");
+	/* put some data into the shared memory object */
+	while (sem_wait(semPtr) && (errno == EINTR)) { sleep(2);}
+	// Semaphore was decremented
+	memcpy(mem_ptr,content,fileSize);
+	//Immediately giving access back to the memory
+	status=sem_post(semPtr);
+	if( status == -1 ) {
+		perror("sem_post");
+		exit(EXIT_FAILURE);
+	}
+	printf("Done! \n");
+
+	changed_msg.type = CHANGED_SHMEM_MSG_TYPE;
+	changed_msg.length = fileSize;
+
+	// informing the receiver that the data in the shared memory has been modified
+
+	printf("Informing the receiver! \n");
+	status = MsgSend( coid, &changed_msg, sizeof(changed_msg), NULL, 0);
+	if( status == -1 ) {
+		perror("Change shmem MsgSend");
+		exit(EXIT_FAILURE);
+	}
+	printf("Unmaping the shared area! \n");
+	(void)munmap(mem_ptr, fileSize);
+	printf("Work done, exiting! \n");
+
+	return 0;
+}
+
+
+
+
+
+
+
 
 unsigned char* readFile(char *File){
 
