@@ -431,7 +431,7 @@ int ipc_receive_queue(char* fileName){
 
 	mqd_t msg_queue;
 	struct mq_attr attrs;
-	int prio;
+	unsigned int prio;
 	int receive_size;
 
 	struct timespec abs_timeout;
