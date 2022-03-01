@@ -14,9 +14,9 @@ int filesize(char* filename);
 #define CHANGED_SHMEM_MSG_TYPE (_IO_MAX+3)
 //#define RELEASE_SHMEM_MSG_TYPE (_IO_MAX+4)
 #define PIPE_FD_SEND (_IO_MAX+5)
-#define iov_block_size 4096
+#define IOV_BLOCK_SIZE 4096
 #define semaphore_ready (_PULSE_CODE_MINAVAIL)
-#define pipe_size 4096
+#define PIPE_SIZE 4096
 
 typedef struct
 {

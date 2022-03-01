@@ -134,23 +134,23 @@ int ipc_send_message(char* fileName){
 	header.data_size=fileSize;
 	header.msg_type=IOV_MSG_TYPE;
 
-	int last_part_size = fileSize%iov_block_size;
-	iov_t siov[(fileSize/iov_block_size)+2];
+	int last_part_size = fileSize%IOV_BLOCK_SIZE;
+	iov_t siov[(fileSize/IOV_BLOCK_SIZE)+2];
 
     unsigned char* buffer=readFile(fileName); //getting the data into the buffer
 
 	SETIOV (&siov[0], &header, sizeof header); //setting header IOV
 
-	for(i=1;i<=fileSize/iov_block_size+1;i++){ //setting data IOVs
-		if (i == fileSize/iov_block_size+1){ //in case it is the last IOV
-			SETIOV (&siov[i], &buffer[(i-1)*iov_block_size], last_part_size);
+	for(i=1;i<=fileSize/IOV_BLOCK_SIZE+1;i++){ //setting data IOVs
+		if (i == fileSize/IOV_BLOCK_SIZE+1){ //in case it is the last IOV
+			SETIOV (&siov[i], &buffer[(i-1)*IOV_BLOCK_SIZE], last_part_size);
 		} else { //else
-			SETIOV (&siov[i], &buffer[(i-1)*iov_block_size], iov_block_size);
+			SETIOV (&siov[i], &buffer[(i-1)*IOV_BLOCK_SIZE], IOV_BLOCK_SIZE);
 		}
 	}
 	//sending the prepared data
 	printf("Sending data...\n");
-	status = MsgSendvs(coid, siov, (fileSize/iov_block_size)+2,&incoming_status,sizeof(incoming_status));
+	status = MsgSendvs(coid, siov, (fileSize/IOV_BLOCK_SIZE)+2,&incoming_status,sizeof(incoming_status));
 	free (buffer);
 	if (status == -1)
 	{ //was there an error sending to server?
@@ -310,15 +310,15 @@ int ipc_send_pipe(char* fileName){
 
 	buffer=readFile(fileName);
 	fileSize = filesize(fileName);
-	part_size = fileSize % pipe_size;
+	part_size = fileSize % PIPE_SIZE;
 
 	int i;
-	for (i=0; i<(fileSize/pipe_size)+1;i++){
-		if (i == (fileSize/pipe_size)){ // case of the last part to send
-			status=write(fd,buffer+(i*pipe_size),part_size);
+	for (i=0; i<(fileSize/PIPE_SIZE)+1;i++){
+		if (i == (fileSize/PIPE_SIZE)){ // case of the last part to send
+			status=write(fd,buffer+(i*PIPE_SIZE),part_size);
 		}
 		else{ // normal case
-			status=write(fd,buffer+(i*pipe_size),pipe_size);
+			status=write(fd,buffer+(i*PIPE_SIZE),PIPE_SIZE);
 		}
 		if (status == -1) {
 			perror("write()");

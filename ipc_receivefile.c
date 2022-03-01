@@ -371,6 +371,7 @@ int ipc_receive_pipe(char* fileName){
 	buffer = malloc(pipe_size);
 	if (buffer== NULL)
 	{
+		free(buffer);
 		fprintf(stderr, "ERROR: Malloc");
 		exit(EXIT_FAILURE);
 	}
@@ -381,6 +382,7 @@ int ipc_receive_pipe(char* fileName){
 	
 	fd = open(pipe_name, O_RDONLY);
 	if (fd == -1) {
+		free(buffer);
 		perror ("open pipe");
 		exit (EXIT_FAILURE);
 	}
@@ -388,11 +390,15 @@ int ipc_receive_pipe(char* fileName){
 		part_size=read(fd, buffer, pipe_size);
 		if (part_size == -1)
 		{
+			close (fd);
+			free(buffer);
 			perror("Pipe read");
 			exit(EXIT_FAILURE);
 		}
 		status=writeFile(buffer,fileName,part_size);//writing message to the file
 		if (status != 0){
+			close (fd);
+			free(buffer);
 			printf("writeFile Error\n");
 			exit(EXIT_FAILURE);
 		}
