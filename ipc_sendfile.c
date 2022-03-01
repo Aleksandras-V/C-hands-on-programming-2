@@ -394,7 +394,7 @@ int ipc_send_mqueue(char* fileName){
 
 		if (status == -1) {
 			perror ("mq_send()");
-			return EXIT_FAILURE;
+			exit(EXIT_FAILURE);
 		}
 	}
 	rest_size = rest_size - (MAX_MSG_QUEUE_SIZE * MAX_MSG_QUEUE);
@@ -404,7 +404,7 @@ int ipc_send_mqueue(char* fileName){
 	status = mq_close (msg_queue);
 	if (status == -1) {
 		perror ("mq_close()");
-	    return EXIT_FAILURE;
+		exit(EXIT_FAILURE);
 	}
 
 	return 0;

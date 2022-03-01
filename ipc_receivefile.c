@@ -431,7 +431,7 @@ int ipc_receive_queue(char* fileName){
 
 	mqd_t msg_queue;
 	struct mq_attr attrs;
-	int prio;
+	unsigned int prio;
 	int receive_size;
 
 	struct timespec abs_timeout;
@@ -450,6 +450,7 @@ int ipc_receive_queue(char* fileName){
 	}while (errno == ENOENT);
 
 	if (msg_queue == -1){
+		free (buffer);
 		perror ("mq_open");
 		exit(EXIT_FAILURE);
 	}
@@ -465,8 +466,9 @@ int ipc_receive_queue(char* fileName){
 			if (errno == ETIMEDOUT) {
 				printf ("mq_timedreceive() timed out file fully transfered.\n");
 			 } else {
+				free (buffer);
 				perror ("mq_timedreceive()");
-				return EXIT_FAILURE;
+				exit(EXIT_FAILURE);
 			 }
 		} else {
 			status = writeFile(buffer,fileName,receive_size);
@@ -527,8 +529,26 @@ void fileInit(char* file){
 	int status;
 	fptr = fopen(file,"r");
 	if (fptr == NULL){
-		perror("fopen()");
-		exit(EXIT_FAILURE);
+		if (errno == ENOENT){ // file doesn't exist creating it
+			fptr = fopen(file,"w");
+			if (fptr == NULL){
+				perror("fopen()");
+				exit(EXIT_FAILURE);
+			}
+		    status=fclose(fptr);
+		    if (status != 0){
+		    	perror("fclose error");
+		    	exit(EXIT_FAILURE);
+		    }
+		    fptr = fopen(file,"r");
+		    if (fptr == NULL){
+				perror("fopen()");
+				exit(EXIT_FAILURE);
+		    }
+		} else {
+			perror("fopen()");
+			exit(EXIT_FAILURE);
+		}
 	}
 
     fseek (fptr, 0, SEEK_END);
