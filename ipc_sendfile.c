@@ -364,7 +364,7 @@ int ipc_send_mqueue(char* fileName){
 	memset(&attrs, 0, sizeof attrs);
 	attrs.mq_maxmsg = MAX_MSG_QUEUE;
 	attrs.mq_msgsize = MAX_MSG_QUEUE_SIZE;
-	msg_queue = mq_open( "queue", O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG, &attrs );
+	msg_queue = mq_open( "queue", O_WRONLY | O_CREAT | O_EXCL, S_IRWXU | S_IRWXG, &attrs );
 	if (msg_queue == -1) {
 		perror ("mq_open()");
 	    return EXIT_FAILURE;
