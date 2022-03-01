@@ -2,6 +2,7 @@
 
 #define MSG_RECV_NAME "IPC_MSG_RECEIVER"
 #define SHMEM_SERVER_NAME "IPC_SHMEM_RECEIVER"
+#define PIPE_RECV_NAME "IPC_PIPE_RECEIVER"
 
 
 #define MAX_STRING_LEN    256
@@ -11,6 +12,7 @@ void display_help(void); // displays help message
 void display_arg_error(void); // displays arguments error message
 int ipc_receive_message(char* fileName);// receives a file using messages, returns status;
 int ipc_receive_shm(char* fileName);// receives a file using shared memory, returns status;
+int ipc_receive_pipe(char* fileName);// receives a file using pipe returns status;
 
 void fileInit(char* file); // Prepares a file (overwrites if it isn't empty)
 int writeFile(unsigned char* textmsg,char* file,int size); //Writes size characters of char* textmsg to the file specified.
