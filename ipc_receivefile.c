@@ -371,7 +371,7 @@ int ipc_receive_pipe(char* fileName){
 	buffer = malloc(pipe_size);
 	if (buffer== NULL)
 	{
-		printf("ERROR: Malloc");
+		fprintf(stderr, "ERROR: Malloc");
 		exit(EXIT_FAILURE);
 	}
 	printf ("Connecting to Pipe... \n");
