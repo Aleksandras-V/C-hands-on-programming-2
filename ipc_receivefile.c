@@ -23,6 +23,7 @@ typedef union
 	msg_header_t header;
 } msg_buf_t;
 
+
 int main(int argc, char *argv[]) {
 
 	if (argc < 2){
@@ -34,14 +35,14 @@ int main(int argc, char *argv[]) {
 	int next_option;
 
 
-	const char* const short_options = "hms:f";
+	const char* const short_options = "hmsp:f";
 
 
 	const struct option long_options[] = {
 		{ "help",     0, NULL, 'h' },
 	    { "messages",   0, NULL, 'm' },
 		//{ "queue",     0, NULL, 'q' },
-		//{ "pipe",     0, NULL, 'p' },
+		{ "pipe",     0, NULL, 'p' },
 		{ "shm",     0, NULL, 's' },
 		{ "file",     1, NULL, 'f' },
 		{ NULL,       0, NULL, 0   }   /* Required at end of array.  */
@@ -81,9 +82,14 @@ int main(int argc, char *argv[]) {
 	    		exit(EXIT_FAILURE);
 	    	}
 	    	return ipc_receive_shm(fileName);
-	   case 'f':
+	    case 'p':   /* -s or --shm */
+	    	if (fileName == NULL){
+	    		printf("ERROR: To copy a file using pipe type:\nipc_receivefile --pipe --file <path_to_source/file>\nfor more informations:   ipc_receivefile --help    \n");
+	    		exit(EXIT_FAILURE);
+	    	}
+	    	return ipc_receive_pipe(fileName);
+	    case 'f':
 	    	break;
-
 	    case '?':   /* The user specified an invalid option.  */
 	    	display_arg_error();
 	    	exit(EXIT_FAILURE);
@@ -103,6 +109,8 @@ void display_help(void)
     printf("Commands:\n");
     printf("To display this message: ipc_receivefile --help \n");
     printf("To receive a file using messages: ipc_receivefile --messages --file <path_to_dest/file> \n");
+    printf("To receive a file using shared memory: ipc_receivefile --shm --file <path_to_dest/file> \n");
+    printf("To receive a file using pipe: ipc_receivefile --pipe --file <path_to_dest/file> \n");
 }
 void display_arg_error(void)
 {
@@ -213,7 +221,7 @@ int ipc_receive_shm(char* fileName){
 	shmem_recv_buf_t rbuf;
 	int client_scoid = 0; // no client yet
 	struct _msg_info msg_info;
-	char *shmem_ptr;
+	unsigned char *shmem_ptr;
 	unsigned shmem_memory_size;
 	get_shmem_resp_t get_resp;
 	int status;
@@ -349,7 +357,69 @@ int ipc_receive_shm(char* fileName){
 	return 1;
 }
 
+int ipc_receive_pipe(char* fileName){
 
+	int status;
+	int fd;
+	int part_size;
+
+	unsigned char* buffer;
+
+	printf("Initializing file... \n");
+	fileInit(fileName);
+
+	buffer = malloc(pipe_size);
+	if (buffer== NULL)
+	{
+		free(buffer);
+		fprintf(stderr, "ERROR: Malloc");
+		exit(EXIT_FAILURE);
+	}
+	printf ("Connecting to Pipe... \n");
+	while (-1 == access (pipe_name, F_OK)) {
+	        sleep (2);					
+	}
+	
+	fd = open(pipe_name, O_RDONLY);
+	if (fd == -1) {
+		free(buffer);
+		perror ("open pipe");
+		exit (EXIT_FAILURE);
+	}
+	do{
+		part_size=read(fd, buffer, pipe_size);
+		if (part_size == -1)
+		{
+			close (fd);
+			free(buffer);
+			perror("Pipe read");
+			exit(EXIT_FAILURE);
+		}
+		status=writeFile(buffer,fileName,part_size);//writing message to the file
+		if (status != 0){
+			close (fd);
+			free(buffer);
+			printf("writeFile Error\n");
+			exit(EXIT_FAILURE);
+		}
+	}while(part_size != 0);
+
+	free (buffer);
+	printf("Writing complete, work done, exiting... \n");
+	status=close (fd);
+	if (status == -1)
+	{
+		perror("close()");
+		exit(EXIT_FAILURE);
+	}
+	status=remove (pipe_name);
+	if (status == -1)
+	{
+		perror("remove");
+		exit(EXIT_FAILURE);
+	}
+	return 0;
+}
 
 
 

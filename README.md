@@ -10,5 +10,8 @@ Both files should exist!
 - Shared memory, use : 
     - `ipc_receivefile --shm --file <your dest file>`
     - `ipc_sendfile --shm --file <your source file>`
+- Pipe, use : 
+    - `ipc_receivefile --pipe --file <your dest file>`
+    - `ipc_sendfile --pipe --file <your source file>`
 
 - For command information use : `ipc_receivefile --help` and `ipc_sendfile --help`
