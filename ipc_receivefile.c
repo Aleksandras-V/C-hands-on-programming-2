@@ -375,18 +375,15 @@ int ipc_receive_pipe(char* fileName){
 		exit(EXIT_FAILURE);
 	}
 	printf ("Connecting to Pipe... \n");
-	do {
-		status = access(pipe_name,F_OK);
-		if (status == -1 ){
-			sleep(2);
-		}else{
-			fd = open(pipe_name, O_RDONLY);
-			if (fd == -1){
-				perror ("open pipe");
-				exit(EXIT_FAILURE);
-			}
-		}
-	} while (status == -1);
+	while (-1 == access (pipe_name, F_OK)) {
+	        sleep (2);					
+	}
+	
+	fd = open(pipe_name, O_RDONLY);
+	if (fd == -1) {
+		perror ("open pipe");
+		exit (EXIT_FAILURE);
+	}
 	do{
 		part_size=read(fd, buffer, pipe_size);
 		if (part_size == -1)
