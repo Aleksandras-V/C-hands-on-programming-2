@@ -8,6 +8,7 @@
 #include <sys/neutrino.h>
 #include <getopt.h>
 #include <semaphore.h>
+#include <mqueue.h>
 #include "ipc_receivefile.h"
 #include "ipc_sendfile.h"
 
@@ -41,7 +42,7 @@ int main(int argc, char *argv[]) {
 	const struct option long_options[] = {
 		{ "help",     0, NULL, 'h' },
 	    { "messages",   0, NULL, 'm' },
-		//{ "queue",     0, NULL, 'q' },
+		{ "queue",     0, NULL, 'q' },
 		{ "pipe",     0, NULL, 'p' },
 		{ "shm",     0, NULL, 's' },
 		{ "file",     1, NULL, 'f' },
@@ -88,6 +89,12 @@ int main(int argc, char *argv[]) {
 	    		exit(EXIT_FAILURE);
 	    	}
 	    	return ipc_receive_pipe(fileName);
+	    case 'q':   /* -q or --queue */
+	    	if (fileName == NULL){
+	    		printf("ERROR: To copy a file using queues type:\nipc_receivefile --queue --file <path_to_source/file>\nfor more informations:   ipc_receivefile --help    \n");
+	    		exit(EXIT_FAILURE);
+	    	}
+	    	return ipc_receive_queue(fileName);
 	    case 'f':
 	    	break;
 	    case '?':   /* The user specified an invalid option.  */
@@ -111,6 +118,7 @@ void display_help(void)
     printf("To receive a file using messages: ipc_receivefile --messages --file <path_to_dest/file> \n");
     printf("To receive a file using shared memory: ipc_receivefile --shm --file <path_to_dest/file> \n");
     printf("To receive a file using pipe: ipc_receivefile --pipe --file <path_to_dest/file> \n");
+    printf("To receive a file using queues: ipc_receivefile --queue --file <path_to_dest/file> \n");
 }
 void display_arg_error(void)
 {
@@ -155,7 +163,7 @@ int ipc_receive_message(char* fileName)
 		{
 			printf("Got an IPC message \n");
 
-			unsigned char* data;
+			char* data;
 
 			data = malloc(msg.header.data_size);
 			if (data == NULL)
@@ -221,7 +229,7 @@ int ipc_receive_shm(char* fileName){
 	shmem_recv_buf_t rbuf;
 	int client_scoid = 0; // no client yet
 	struct _msg_info msg_info;
-	unsigned char *shmem_ptr;
+	char *shmem_ptr;
 	unsigned shmem_memory_size;
 	get_shmem_resp_t get_resp;
 	int status;
@@ -363,7 +371,7 @@ int ipc_receive_pipe(char* fileName){
 	int fd;
 	int part_size;
 
-	unsigned char* buffer;
+	char* buffer;
 
 	printf("Initializing file... \n");
 	fileInit(fileName);
@@ -421,6 +429,75 @@ int ipc_receive_pipe(char* fileName){
 	return 0;
 }
 
+int ipc_receive_queue(char* fileName){
+	int status;
+
+	mqd_t msg_queue;
+	struct mq_attr attrs;
+	unsigned int prio;
+	int receive_size;
+
+	struct timespec abs_timeout;
+	fileInit(fileName);
+	char * buffer = malloc (MAX_MSG_QUEUE_SIZE);
+	memset(&attrs, 0, sizeof attrs);
+
+	printf("Connecting to the queue\n");
+
+	do {
+		errno = 0;
+		msg_queue = mq_open( "queue", O_RDONLY, &attrs );
+		if (errno == ENOENT){
+			sleep (2);
+		}
+	}while (errno == ENOENT);
+
+	if (msg_queue == -1){
+		free (buffer);
+		perror ("mq_open");
+		exit(EXIT_FAILURE);
+	}
+
+	clock_gettime(CLOCK_REALTIME, &abs_timeout);
+	abs_timeout.tv_sec += 1;
+
+	do {
+
+		receive_size = mq_timedreceive (msg_queue, buffer, MAX_MSG_QUEUE_SIZE, &prio,&abs_timeout);
+
+		if (receive_size == -1) {
+			if (errno == ETIMEDOUT) {
+				printf ("mq_timedreceive() timed out file fully transfered.\n");
+			 } else {
+				free (buffer);
+				perror ("mq_timedreceive()");
+				exit(EXIT_FAILURE);
+			 }
+		} else {
+			status = writeFile(buffer,fileName,receive_size);
+			if (status == -1){
+				printf("WriteFile error");
+				exit(EXIT_FAILURE);
+			}
+		}
+	} while (receive_size > 0);
+	printf ("Work done, cleaning and exiting...\n");
+	free (buffer);
+
+	status = mq_unlink ("queue");
+	if (status == -1) {
+		perror ("mq_unlink()");
+	    return EXIT_FAILURE;
+	}
+
+	status = mq_close (msg_queue);
+	if (status == -1) {
+		perror ("mq_close()");
+	    return EXIT_FAILURE;
+	}
+
+	return 0;
+}
 
 
 
@@ -428,9 +505,7 @@ int ipc_receive_pipe(char* fileName){
 
 
 
-
-
-int writeFile(unsigned char* textmsg,char* file, int size){
+int writeFile(char* textmsg,char* file, int size){
 	FILE *fptr;
 	int status;
 
@@ -457,8 +532,26 @@ void fileInit(char* file){
 	int status;
 	fptr = fopen(file,"r");
 	if (fptr == NULL){
-		perror("fopen()");
-		exit(EXIT_FAILURE);
+		if (errno == ENOENT){ // file doesn't exist creating it
+			fptr = fopen(file,"w");
+			if (fptr == NULL){
+				perror("fopen()");
+				exit(EXIT_FAILURE);
+			}
+		    status=fclose(fptr);
+		    if (status != 0){
+		    	perror("fclose error");
+		    	exit(EXIT_FAILURE);
+		    }
+		    fptr = fopen(file,"r");
+		    if (fptr == NULL){
+				perror("fopen()");
+				exit(EXIT_FAILURE);
+		    }
+		} else {
+			perror("fopen()");
+			exit(EXIT_FAILURE);
+		}
 	}
 
     fseek (fptr, 0, SEEK_END);
