@@ -8,6 +8,7 @@
 #include <getopt.h>
 #include <sys/netmgr.h>
 #include <semaphore.h>
+#include <mqueue.h>
 #include "ipc_receivefile.h"
 #include "ipc_sendfile.h"
 
@@ -28,7 +29,7 @@ int main(int argc, char *argv[]) {
 	const struct option long_options[] = {
 		{ "help",     0, NULL, 'h' },
 	    { "messages",   0, NULL, 'm' },
-		//{ "queue",     0, NULL, 'q' },
+		{ "queue",     0, NULL, 'q' },
 		{"pipe",     0, NULL, 'p' },
 		{ "shm",     0, NULL, 's' },
 		{ "file",     1, NULL, 'f' },
@@ -75,6 +76,12 @@ int main(int argc, char *argv[]) {
 	    		exit(EXIT_FAILURE);
 	    	}
 	    	return ipc_send_pipe(fileName);
+	    case 'q':   /* -q or --queue */
+	    	if (fileName == NULL){
+	    		printf("ERROR: To copy a file using queues type:\nipc_sendfile --queue --file <path_to_source/file>\nfor more informations:   ipc_sendfile --help    \n");
+	    		exit(EXIT_FAILURE);
+	    	}
+	    	return ipc_send_mqueue(fileName);
 	    case 'f':
 	    	break;
 
@@ -98,6 +105,7 @@ void display_help(void)
     printf("To send a file using messages: ipc_sendfile --messages --file <path_to_source/file> \n");
     printf("To copy a file using shared memory type:\nipc_sendfile --shm --file <path_to_source/file>\n");
     printf("To copy a file using pipe type:\nipc_sendfile --pipe --file <path_to_source/file>\n");
+    printf("To copy a file using queues type:\nipc_sendfile --queue --file <path_to_source/file>\n");
 }
 void display_arg_error(void)
 {
@@ -137,7 +145,7 @@ int ipc_send_message(char* fileName){
 	int last_part_size = fileSize%IOV_BLOCK_SIZE;
 	iov_t siov[(fileSize/IOV_BLOCK_SIZE)+2];
 
-    unsigned char* buffer=readFile(fileName); //getting the data into the buffer
+    char* buffer=readFile(fileName); //getting the data into the buffer
 
 	SETIOV (&siov[0], &header, sizeof header); //setting header IOV
 
@@ -184,7 +192,7 @@ int ipc_send_shm(char* fileName){
 
 	sem_t* semPtr;	/* Pointer to semaphore */
 
-	unsigned char* content;
+	char* content;
 
 
 	void* gatekeeper(void*);
@@ -282,7 +290,7 @@ int ipc_send_pipe(char* fileName){
 
 	int status;
 	int fileSize;
-	unsigned char* buffer;
+	char* buffer;
 	int fd;
 	int part_size;
 
@@ -340,6 +348,67 @@ int ipc_send_pipe(char* fileName){
 	return 0;
 }
 
+int ipc_send_mqueue(char* fileName){
+	struct mq_attr attrs;
+	mqd_t msg_queue;
+	int status;
+	char * buffer;
+
+
+	int part_nb;
+
+	int fileSize;
+
+	printf("Creating Queue... \n");
+
+	memset(&attrs, 0, sizeof attrs);
+	attrs.mq_maxmsg = MAX_MSG_QUEUE;
+	attrs.mq_msgsize = MAX_MSG_QUEUE_SIZE;
+	msg_queue = mq_open( "queue", O_WRONLY | O_CREAT | O_EXCL, S_IRWXU | S_IRWXG, &attrs );
+	if (msg_queue == -1) {
+		perror ("mq_open()");
+	    return EXIT_FAILURE;
+	}
+	printf("Queue opened! \n");
+
+
+	fileSize = filesize(fileName);
+	buffer = readFile(fileName);
+	int rest_size = fileSize;
+
+	int i;
+	int part_size;
+
+	part_nb = (rest_size / MAX_MSG_QUEUE_SIZE)+1;
+
+	printf("Filling Queue... \n");
+
+	// filling the queue
+	for (i=0; i<part_nb;i++){
+		if (i < part_nb-1 ){ //the part that we are filling isn't the last
+			part_size = MAX_MSG_QUEUE_SIZE;
+		}else {
+			part_size = rest_size %  MAX_MSG_QUEUE_SIZE;
+		}
+		status = mq_send(msg_queue,buffer+(i*MAX_MSG_QUEUE_SIZE),part_size,5);
+
+		if (status == -1) {
+			perror ("mq_send()");
+			exit(EXIT_FAILURE);
+		}
+	}
+	rest_size = rest_size - (MAX_MSG_QUEUE_SIZE * MAX_MSG_QUEUE);
+	printf("Queue ready, cleaning and exiting... \n");
+	free (buffer);
+
+	status = mq_close (msg_queue);
+	if (status == -1) {
+		perror ("mq_close()");
+		exit(EXIT_FAILURE);
+	}
+
+	return 0;
+}
 
 
 
@@ -347,12 +416,12 @@ int ipc_send_pipe(char* fileName){
 
 
 
-unsigned char* readFile(char *File){
+char* readFile(char *File){
 
 	int fd;
     int size_read;
     int fileSize= filesize(File);
-    unsigned char* content = malloc(fileSize);
+    char* content = malloc(fileSize);
 
     fd = open( File, O_RDONLY );
     if (fd == -1){

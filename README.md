@@ -13,5 +13,8 @@ Both files should exist!
 - Pipe, use : 
     - `ipc_receivefile --pipe --file <your dest file>`
     - `ipc_sendfile --pipe --file <your source file>`
+- Queues, use : 
+    - `ipc_receivefile --queue --file <your dest file>`
+    - `ipc_sendfile --queue --file <your source file>`
 
 - For command information use : `ipc_receivefile --help` and `ipc_sendfile --help`

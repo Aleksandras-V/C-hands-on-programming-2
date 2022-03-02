@@ -4,7 +4,8 @@
 int ipc_send_message(char* fileName);
 int ipc_send_shm(char* fileName);
 int ipc_send_pipe(char* fileName);
-unsigned char* readFile(char *File); // Allocates and returns the address to the binary data of a file;
+int ipc_send_mqueue(char* fileName);
+char* readFile(char *File); // Allocates and returns the address to the binary data of a file;
 
 int filesize(char* filename);
 
@@ -38,3 +39,7 @@ typedef struct changed_shmem_msg {
 
 /// PIPE
 #define pipe_name ("/tmp/pipe")
+
+/// MESSAGE QUEUES
+#define MAX_MSG_QUEUE_SIZE 4096
+#define MAX_MSG_QUEUE 1024
